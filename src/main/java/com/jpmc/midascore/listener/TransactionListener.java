@@ -14,7 +14,7 @@ public class TransactionListener {
 
     static final Logger logger = LoggerFactory.getLogger(TransactionListener.class);
 
-    @KafkaListener(topics = "${general.kafka-topic}")
+    @KafkaListener(topics = "${general.kafka-topic}", groupId = "midas-core-group")
     public void handleTransaction(Transaction transaction) {
         logger.info("received transaction: {}", transaction);
     }
