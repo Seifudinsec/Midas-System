@@ -1,7 +1,9 @@
 package com.jpmc.midascore.listener;
 
+import com.jpmc.midascore.component.IncentiveClient;
 import com.jpmc.midascore.entity.TransactionRecord;
 import com.jpmc.midascore.entity.UserRecord;
+import com.jpmc.midascore.foundation.Incentive;
 import com.jpmc.midascore.foundation.Transaction;
 import com.jpmc.midascore.repository.TransactionRecordRepository;
 import com.jpmc.midascore.repository.UserRepository;
@@ -19,10 +21,12 @@ public class TransactionListener {
 
     private final UserRepository userRepository;
     private final TransactionRecordRepository transactionRecordRepository;
+    private final IncentiveClient incentiveClient;
 
-    public TransactionListener(UserRepository userRepository, TransactionRecordRepository transactionRecordRepository) {
+    public TransactionListener(UserRepository userRepository, TransactionRecordRepository transactionRecordRepository, IncentiveClient incentiveClient) {
         this.userRepository = userRepository;
         this.transactionRecordRepository = transactionRecordRepository;
+        this.incentiveClient = incentiveClient;
     }
 
     @KafkaListener(topics = "${general.kafka-topic}", groupId = "midas-core-group")
@@ -40,15 +44,18 @@ public class TransactionListener {
             return;
         }
 
+        Incentive incentive = incentiveClient.getIncentive(transaction);
+        float incentiveAmount = (incentive != null) ? incentive.getAmount() : 0;
+
         sender.setBalance(sender.getBalance() - transaction.getAmount());
-        recipient.setBalance(recipient.getBalance() + transaction.getAmount());
+        recipient.setBalance(recipient.getBalance() + transaction.getAmount() + incentiveAmount);
 
         userRepository.save(sender);
         userRepository.save(recipient);
 
-        TransactionRecord transactionRecord = new TransactionRecord(sender, recipient, transaction.getAmount());
+        TransactionRecord transactionRecord = new TransactionRecord(sender, recipient, transaction.getAmount(), incentiveAmount);
         transactionRecordRepository.save(transactionRecord);
 
-        logger.info("processed transaction: {}", transaction);
+        logger.info("processed transaction: {} with incentive: {}", transaction, incentiveAmount);
     }
 }
